@@ -1,4 +1,4 @@
-# ProxLook
+# <img src="ProxLook-logo.png" alt="ProxLook Logo" width="40" height="40" style="vertical-align: middle; margin-right: 10px;"> ProxLook
 
 **ProxLook** is a self‑hosted web application that scans and visualizes your Proxmox VE environment in a single, clean dashboard.
 
