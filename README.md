@@ -92,7 +92,9 @@ uvicorn main:app --host 0.0.0.0 --port 8090
 ```
 
 ### 5. Docker Deployment (Recommended)
-ProxLook can be easily deployed using Docker:
+ProxLook is available as a pre-built Docker image on Docker Hub: `abeggi/proxlook:latest`
+
+You can deploy it easily using Docker:
 
 #### Using Docker Compose (easiest):
 ```bash
@@ -108,24 +110,26 @@ docker-compose down
 
 #### Using Docker directly:
 ```bash
-# Build the image
-./docker-build.sh
+# Pull the latest image from Docker Hub
+docker pull abeggi/proxlook:latest
 
 # Run the container
 docker run -d \
   --name proxlook \
   -p 8090:8090 \
   -v proxlook_data:/app/data \
-  proxlook:latest
+  abeggi/proxlook:latest
 ```
 
-#### Using the build script:
+#### For development or custom builds:
+If you need to build a custom version, you can use:
 ```bash
-# Build with custom name/tag
-./docker-build.sh --name myproxlook --tag v1.0
+# Build from source
+docker build -t myproxlook:v1.0 .
 
-# Build and push to registry
-./docker-build.sh --registry docker.io/username --push
+# Push to your registry
+docker tag myproxlook:v1.0 docker.io/yourusername/proxlook:v1.0
+docker push docker.io/yourusername/proxlook:v1.0
 ```
 
 ### 6. Application Management
@@ -288,7 +292,7 @@ docker run -d \
   -e DATABASE_URL=sqlite:////app/data/proxlook.db \
   -e LOG_LEVEL=INFO \
   -p 8090:8090 \
-  proxlook:latest
+  abeggi/proxlook:latest
 ```
 
 Or use a custom `.env` file:
@@ -296,7 +300,7 @@ Or use a custom `.env` file:
 docker run -d \
   --env-file .env \
   -p 8090:8090 \
-  proxlook:latest
+  abeggi/proxlook:latest
 ```
 
 ---

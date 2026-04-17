@@ -5,7 +5,7 @@ version: '3.8'
 
 services:
   proxlook:
-    build: .
+    image: abeggi/proxlook:latest
     container_name: proxlook
     restart: unless-stopped
     ports:
