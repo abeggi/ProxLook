@@ -1,0 +1,84 @@
+# ProxLook Git Ignore File
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+.venv/
+venv*/
+env*/
+.venv*/
+
+# Database
+*.db
+*.db-journal
+*.sqlite3
+
+# Logs
+*.log
+*.log.*
+app.log
+app.pid
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Docker
+!.dockerignore
+Dockerfile
+docker-compose.yml
+docker-build.sh
+
+# Test coverage
+.coverage
+.coverage.*
+.pytest_cache/
+
+# Documentation
+README.md.original
+*.backup
+*.bak
+*.old
+
+# Systemd service example
+*.service.example
+
+# Docker env example
+.env.docker.example

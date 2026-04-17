@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+proxmoxer
+requests
+apscheduler
+sqlalchemy
+python-dotenv
+paramiko

@@ -1,0 +1,1024 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProxLook</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --bg-body: #0f172a;
+            --bg-card: #1e293b;
+            --bg-header: #1e293b;
+            --text-main: #f8fafc;
+            --text-dim: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --success: #10b981;
+            --danger: #ef4444;
+            --warning: #f59e0b;
+            --border: #334155;
+            --radius: 12px;
+            --shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+        }
+
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-body);
+            color: var(--text-main);
+            overflow-x: hidden;
+        }
+
+        /* Top Bar */
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .header-bg-glow {
+            position: absolute;
+            top: -50px; left: 50%;
+            transform: translateX(-50%);
+            width: 300px; height: 100px;
+            background: var(--accent);
+            filter: blur(80px);
+            opacity: 0.1;
+            pointer-events: none;
+        }
+        .logo { font-size: 1.5rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+        .logo span { color: var(--accent); }
+
+        .header-actions { display: flex; align-items: center; gap: 1.5rem; }
+        .scan-info { font-size: 0.875rem; color: var(--text-dim); text-align: right; }
+        #scan-error-indicator {
+            display: none;
+            margin-left: 0.4rem;
+            color: var(--danger);
+            cursor: help;
+            font-weight: 700;
+        }
+
+        /* Main Area */
+        main { padding: 2rem; max-width: 1400px; margin: 0 auto; min-height: 80vh; }
+
+        .host-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 1.5rem;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+        .host-header {
+            padding: 1rem 1.5rem;
+            background: rgba(255, 255, 255, 0.03);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            user-select: none;
+        }
+        .host-header:hover { background: rgba(255, 255, 255, 0.05); }
+        .host-title { font-size: 1rem; font-weight: 600; display: flex; align-items: center; gap: 12px; }
+        
+        .toggle-icon {
+            font-size: 0.75rem;
+            transition: transform 0.2s ease;
+            color: var(--text-dim);
+        }
+        .host-card.collapsed .toggle-icon { transform: rotate(-90deg); }
+        .host-content { 
+            border-top: 1px solid var(--border);
+            max-height: 5000px; 
+            overflow: hidden;
+            transition: max-height 0.3s ease-out;
+        }
+        .host-card.collapsed .host-content { max-height: 0; border-top: none; }
+
+        .node-section { padding: 1rem 1.5rem; border-bottom: 1px solid rgba(51, 65, 85, 0.4); }
+        .node-section:last-child { border-bottom: none; }
+        .node-title { font-size: 0.8rem; color: var(--text-dim); margin-bottom: 0.75rem; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; }
+
+        table { width: 100%; border-collapse: collapse; }
+        th { text-align: left; padding: 0.75rem; font-size: 0.7rem; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.025em; border-bottom: 1px solid var(--border); }
+        .sortable-th { cursor: pointer; user-select: none; }
+        .sortable-th:hover { color: var(--text-main); }
+        td { padding: 0.75rem; font-size: 0.85rem; border-bottom: 1px solid rgba(51, 65, 85, 0.2); }
+        tr:last-child td { border-bottom: none; }
+        tr:hover td { background: rgba(255, 255, 255, 0.02); }
+
+        .badge {
+            padding: 0.2rem 0.5rem;
+            border-radius: 6px;
+            font-size: 0.7rem;
+            font-weight: 700;
+        }
+        .badge-qemu { background: #6366f1; color: white; }
+        .badge-lxc { background: #8b5cf6; color: white; }
+        .badge-running { background: rgba(16, 185, 129, 0.2); color: var(--success); }
+        .badge-stopped { background: rgba(148, 163, 184, 0.2); color: var(--text-dim); }
+        .badge-other { background: rgba(245, 158, 11, 0.2); color: var(--warning); }
+        .badge-changed { background: rgba(245, 158, 11, 0.25); color: #fbbf24; margin-left: 0.45rem; }
+
+        .count-tag {
+            padding: 2px 8px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            color: var(--text-dim);
+            margin-left: 8px;
+        }
+
+        button {
+            cursor: pointer;
+            border: none;
+            border-radius: 8px;
+            padding: 0.4rem 0.8rem;
+            font-family: inherit;
+            font-size: 0.85rem;
+            font-weight: 500;
+            transition: all 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-primary { background: var(--accent); color: white; }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); }
+        .btn-secondary { background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--border); }
+        .btn-secondary:hover { background: rgba(255,255,255,0.1); }
+        .btn-icon { padding: 0.5rem; border-radius: 8px; }
+        .btn-small { padding: 0.35rem 0.6rem; font-size: 0.75rem; }
+        .toolbar-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 1rem;
+            margin-bottom: 1rem;
+            box-shadow: var(--shadow);
+        }
+        .toolbar-grid {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr 1fr 1fr 1.2fr auto auto;
+            gap: 0.6rem;
+            align-items: end;
+        }
+        .toolbar-field label {
+            display: block;
+            font-size: 0.68rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-dim);
+            margin-bottom: 0.25rem;
+        }
+        .toolbar-field input,
+        .toolbar-field select {
+            width: 100%;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-main);
+            font-family: inherit;
+            padding: 0.5rem 0.6rem;
+            font-size: 0.8rem;
+        }
+        .toolbar-field select option {
+            background: var(--bg-body);
+            color: var(--text-main);
+        }
+        .toolbar-meta {
+            margin-top: 0.55rem;
+            color: var(--text-dim);
+            font-size: 0.78rem;
+        }
+
+        /* Modal for SSH Credentials */
+        #ssh-modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+            z-index: 2000; display: none; align-items: center; justify-content: center;
+        }
+        #ssh-modal {
+            background: var(--bg-card); border: 1px solid var(--border);
+            border-radius: var(--radius); width: 400px; padding: 2rem;
+            box-shadow: var(--shadow);
+        }
+
+        .flex { display: flex; }
+        .gap-2 { gap: 0.5rem; }
+        .text-sm { font-size: 0.8rem; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        #app-toast {
+            position: fixed;
+            bottom: 1.5rem;
+            right: 1.5rem;
+            background: rgba(59, 130, 246, 0.95);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 10px;
+            padding: 0.6rem 0.9rem;
+            font-size: 0.85rem;
+            font-weight: 600;
+            box-shadow: var(--shadow);
+            z-index: 2500;
+            display: none;
+        }
+        #app-toast.success { background: rgba(16, 185, 129, 0.95); }
+        #app-toast.error { background: rgba(239, 68, 68, 0.95); }
+        #app-toast.info { background: rgba(59, 130, 246, 0.95); }
+        #app-toast.warning {
+            background: rgba(239, 68, 68, 0.95);
+        }
+        #scan-summary-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.65);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
+        #scan-summary-modal {
+            width: min(860px, 96vw);
+            max-height: 85vh;
+            overflow: auto;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            box-shadow: var(--shadow);
+            padding: 1.1rem 1.2rem;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.6rem;
+            margin: 0.9rem 0;
+        }
+        .summary-pill {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+            padding: 0.45rem 0.6rem;
+            font-size: 0.8rem;
+        }
+        .summary-section {
+            margin-top: 0.9rem;
+            border-top: 1px solid var(--border);
+            padding-top: 0.7rem;
+        }
+        .summary-list {
+            margin: 0.4rem 0 0;
+            padding-left: 1.1rem;
+            color: var(--text-dim);
+            font-size: 0.8rem;
+        }
+        .summary-list li { margin: 0.2rem 0; }
+        @media (max-width: 1200px) {
+            .toolbar-grid {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="header-bg-glow"></div>
+    <header>
+        <div class="logo"><span>⚡</span> ProxLook</div>
+        <div class="header-actions">
+            <div class="scan-info">
+                <div id="last-scan-time">Last scan: Never <span id="scan-error-indicator">!</span></div>
+            </div>
+            <button id="last-summary-btn" class="btn-secondary" title="View last scan summary">Summary</button>
+            <button id="scan-btn" class="btn-primary">
+                <span id="scan-icon">⟳</span> Scan Now
+            </button>
+            <button id="settings-btn" class="btn-secondary btn-icon" title="Settings">⚙️</button>
+        </div>
+    </header>
+
+    <main>
+        <div class="toolbar-card">
+            <div class="toolbar-grid">
+                <div class="toolbar-field">
+                    <label for="filter-search">Quick Search</label>
+                    <input id="filter-search" type="text" placeholder="Search by name, VMID or IP">
+                </div>
+                <div class="toolbar-field">
+                    <label for="filter-host">Host</label>
+                    <select id="filter-host"><option value="">All hosts</option></select>
+                </div>
+                <div class="toolbar-field">
+                    <label for="filter-node">Node</label>
+                    <select id="filter-node"><option value="">All nodes</option></select>
+                </div>
+                <div class="toolbar-field">
+                    <label for="filter-type">Type</label>
+                    <select id="filter-type">
+                        <option value="">Any</option>
+                        <option value="qemu">VM (QEMU)</option>
+                        <option value="lxc">LXC</option>
+                    </select>
+                </div>
+                <div class="toolbar-field">
+                    <label for="filter-status">Status</label>
+                    <select id="filter-status">
+                        <option value="">Any</option>
+                        <option value="running">Running</option>
+                        <option value="stopped">Stopped</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+                <div class="toolbar-field">
+                    <label for="filter-has-ip">IP</label>
+                    <select id="filter-has-ip">
+                        <option value="">Any</option>
+                        <option value="with">With IP</option>
+                        <option value="without">Without IP</option>
+                    </select>
+                </div>
+                <div class="toolbar-field">
+                    <label for="sort-key-select">Sort by</label>
+                    <select id="sort-key-select">
+                        <option value="name">Name</option>
+                        <option value="ip">IP</option>
+                        <option value="vmid">VMID</option>
+                        <option value="status">Status</option>
+                        <option value="type">Type</option>
+                        <option value="cpus">CPUs</option>
+                        <option value="maxmem">RAM</option>
+                        <option value="maxdisk">Disk</option>
+                    </select>
+                </div>
+                <div class="toolbar-field">
+                    <label>&nbsp;</label>
+                    <button id="sort-direction-btn" class="btn-secondary btn-small" title="Toggle sort direction">Ascending</button>
+                </div>
+            </div>
+            <div class="toolbar-meta" id="filter-summary">Showing all resources</div>
+            <div style="margin-top:0.5rem;">
+                <button id="reset-filters-btn" class="btn-secondary btn-small">Reset Filters</button>
+            </div>
+        </div>
+        <div id="inventory-container">
+            <div style="text-align:center; padding: 5rem; color: var(--text-dim);">
+                Loading inventory...
+            </div>
+        </div>
+    </main>
+    <div id="app-toast">Messaggio</div>
+    <div id="scan-summary-overlay">
+        <div id="scan-summary-modal">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:0.5rem;">
+                <h3 style="margin:0;">Scan Completed</h3>
+                <button id="scan-summary-ok" class="btn-primary">OK</button>
+            </div>
+            <div id="scan-summary-content" style="margin-top:0.6rem; color: var(--text-main);"></div>
+        </div>
+    </div>
+
+    <!-- SSH Credentials Modal -->
+    <div id="ssh-modal-overlay">
+        <div id="ssh-modal">
+            <h3 style="margin-top:0">SSH Credentials</h3>
+            <p id="ssh-modal-target" class="text-dim text-sm"></p>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem; font-weight:600;">Username</label>
+                <input type="text" id="ssh-user" value="root" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; padding:0.6rem; color:white;">
+            </div>
+            <div class="form-group" style="margin-bottom: 1.25rem;">
+                <label style="display:block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem; font-weight:600;">Password</label>
+                <input type="password" id="ssh-pass" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; padding:0.6rem; color:white;">
+            </div>
+            <div id="ssh-advanced" style="display:none; margin-bottom: 1.25rem;">
+                <div class="form-group">
+                    <label style="display:block; font-size: 0.75rem; color: var(--text-dim); margin-bottom: 0.5rem; font-weight:600;">Port</label>
+                    <input type="number" id="ssh-port" value="22" style="width:100%; background:rgba(255,255,255,0.05); border:1px solid var(--border); border-radius:8px; padding:0.6rem; color:white;">
+                </div>
+            </div>
+            <div style="margin-bottom: 1rem;">
+                <a href="#" id="toggle-ssh-advanced" style="font-size: 0.75rem; color: var(--accent); text-decoration:none;">Advanced Options</a>
+            </div>
+            <div class="flex gap-2">
+                <button id="ssh-cancel" class="btn-secondary" style="flex:1; justify-content:center;">Cancel</button>
+                <button id="ssh-connect" class="btn-primary" style="flex:1; justify-content:center;">Connect</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentSshTarget = null;
+        let collapsedHosts = JSON.parse(localStorage.getItem('collapsedHosts') || '{}');
+        let sortState = { key: 'ip', direction: 'asc' };
+        let knownScanTime = null;
+        let shownSummaryScanTime = null;
+        let lastScanSummaryCache = null;
+        let searchDebounceTimer = null;
+        let cachedInventoryData = null;
+        let filterState = {
+            search: '',
+            host: '',
+            node: '',
+            type: '',
+            status: '',
+            hasIp: ''
+        };
+
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('app-toast');
+            toast.innerText = message;
+            toast.className = '';
+            toast.id = 'app-toast';
+            toast.classList.add(type);
+            toast.style.display = 'block';
+            clearTimeout(showToast._timer);
+            showToast._timer = setTimeout(() => {
+                toast.style.display = 'none';
+            }, 2000);
+        }
+
+        async function fetchAPI(url, method = 'GET', body = null) {
+            const options = { method, headers: { 'Content-Type': 'application/json' } };
+            if (body) options.body = JSON.stringify(body);
+            const res = await fetch(url, options);
+            if (res.status === 204) return null;
+            const payload = await res.json();
+            if (!res.ok) {
+                const message = payload?.message || payload?.detail || 'Request failed';
+                throw new Error(message);
+            }
+            return payload;
+        }
+
+        function formatBytes(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function ipSortValue(ip) {
+            if (!ip) return Number.MAX_SAFE_INTEGER;
+            const parts = String(ip).trim().split('.');
+            if (parts.length !== 4) return Number.MAX_SAFE_INTEGER - 1;
+            const nums = parts.map((p) => Number.parseInt(p, 10));
+            if (nums.some((n) => Number.isNaN(n) || n < 0 || n > 255)) return Number.MAX_SAFE_INTEGER - 1;
+            return ((nums[0] * 256 + nums[1]) * 256 + nums[2]) * 256 + nums[3];
+        }
+
+        function toggleSort(key) {
+            if (sortState.key === key) {
+                sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            } else {
+                sortState.key = key;
+                sortState.direction = 'asc';
+            }
+            const sortKeySelect = document.getElementById('sort-key-select');
+            if (sortKeySelect) sortKeySelect.value = sortState.key;
+            updateSortDirectionButton();
+            renderInventory(cachedInventoryData);
+        }
+
+        function renderSortableHeader(key, label) {
+            const isActive = sortState.key === key;
+            const arrow = isActive ? (sortState.direction === 'asc' ? ' ▲' : ' ▼') : '';
+            return `<th class="sortable-th" onclick="toggleSort('${key}')">${label}${arrow}</th>`;
+        }
+
+        function updateSortDirectionButton() {
+            const btn = document.getElementById('sort-direction-btn');
+            if (!btn) return;
+            btn.textContent = sortState.direction === 'asc' ? 'Ascending' : 'Descending';
+        }
+
+        function normalizeStatus(status) {
+            if (status === 'running' || status === 'stopped') return status;
+            return 'other';
+        }
+
+        function resourceMatchesFilters(host, node, resource) {
+            if (filterState.host && String(host.id) !== filterState.host) return false;
+            if (filterState.node && node.node !== filterState.node) return false;
+            if (filterState.type && resource.type !== filterState.type) return false;
+            if (filterState.status && normalizeStatus(resource.status) !== filterState.status) return false;
+            if (filterState.hasIp === 'with' && !resource.ip) return false;
+            if (filterState.hasIp === 'without' && resource.ip) return false;
+            if (filterState.search) {
+                const target = [
+                    resource.name || '',
+                    resource.ip || '',
+                    resource.vmid != null ? String(resource.vmid) : '',
+                    host.display_name || '',
+                    host.host || '',
+                    node.node || ''
+                ].join(' ').toLowerCase();
+                if (!target.includes(filterState.search)) return false;
+            }
+            return true;
+        }
+
+        function resourceIdentity(resource) {
+            return `${resource.pve_host_id}|${resource.node}|${resource.type}|${resource.vmid}`;
+        }
+
+        function getChangedResourceIdSet() {
+            const ids = lastScanSummaryCache?.summary?.changed_resource_ids || [];
+            return new Set(ids);
+        }
+
+        function getChangedResourceReasonMap() {
+            return lastScanSummaryCache?.summary?.changed_resource_reasons || {};
+        }
+
+        function changedBadgeHtml(resource) {
+            const reasonMap = getChangedResourceReasonMap();
+            const reasons = reasonMap[resourceIdentity(resource)] || [];
+            const reasonText = reasons.length > 0 ? `Changed: ${reasons.join(', ')}` : 'Changed in last scan';
+            return `<span class="badge badge-changed" title="${escapeHtml(reasonText)}">Changed</span>`;
+        }
+
+        function updateFilterSummary(total, shown) {
+            const el = document.getElementById('filter-summary');
+            if (!el) return;
+            el.textContent = shown === total
+                ? `Showing all resources (${shown})`
+                : `Showing ${shown} of ${total} resources`;
+        }
+
+        function escapeHtml(value) {
+            return String(value || '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+
+        function renderSummaryList(title, items) {
+            if (!items || items.length === 0) return '';
+            return `
+                <div class="summary-section">
+                    <div style="font-size:0.78rem; font-weight:700; color: var(--text-main);">${escapeHtml(title)}</div>
+                    <ul class="summary-list">
+                        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join('')}
+                    </ul>
+                </div>
+            `;
+        }
+
+        function showScanSummaryModal(scanSummaryWrapper, lastScanStatus, lastScanError) {
+            if (!scanSummaryWrapper || !scanSummaryWrapper.summary) return;
+            const summary = scanSummaryWrapper.summary;
+            const content = document.getElementById('scan-summary-content');
+            const overlay = document.getElementById('scan-summary-overlay');
+            const scanTimeLabel = scanSummaryWrapper.scan_time ? new Date(scanSummaryWrapper.scan_time).toLocaleString() : 'N/A';
+
+            const errorBlock = lastScanStatus === 'error'
+                ? `<div style="color: var(--danger); font-size:0.85rem; margin-bottom:0.6rem;">Scan ended with error: ${escapeHtml(lastScanError || summary.error || 'Unknown error')}</div>`
+                : '';
+
+            content.innerHTML = `
+                ${errorBlock}
+                <div style="font-size:0.8rem; color: var(--text-dim);">Scan time: ${escapeHtml(scanTimeLabel)}</div>
+                <div class="summary-grid">
+                    <div class="summary-pill"><strong>${summary.added_count || 0}</strong> found</div>
+                    <div class="summary-pill"><strong>${summary.removed_count || 0}</strong> removed</div>
+                    <div class="summary-pill"><strong>${summary.started_count || 0}</strong> started</div>
+                    <div class="summary-pill"><strong>${summary.stopped_count || 0}</strong> stopped</div>
+                    <div class="summary-pill"><strong>${summary.status_changed_count || 0}</strong> status changed</div>
+                    <div class="summary-pill"><strong>${summary.renamed_count || 0}</strong> renamed</div>
+                    <div class="summary-pill"><strong>${summary.ip_changed_count || 0}</strong> IP changed</div>
+                    <div class="summary-pill"><strong>${summary.cpu_changed_count || 0}</strong> CPU changed</div>
+                    <div class="summary-pill"><strong>${summary.ram_changed_count || 0}</strong> RAM changed</div>
+                    <div class="summary-pill"><strong>${summary.disk_changed_count || 0}</strong> Disk changed</div>
+                </div>
+                ${renderSummaryList('Found', summary.added)}
+                ${renderSummaryList('Removed', summary.removed)}
+                ${renderSummaryList('Started', summary.started)}
+                ${renderSummaryList('Stopped', summary.stopped)}
+                ${renderSummaryList('Status Changes', summary.status_changed)}
+                ${renderSummaryList('Renamed', summary.renamed)}
+                ${renderSummaryList('IP Changes', summary.ip_changed)}
+                ${renderSummaryList('CPU Changes', summary.cpu_changed)}
+                ${renderSummaryList('RAM Changes', summary.ram_changed)}
+                ${renderSummaryList('Disk Changes', summary.disk_changed)}
+            `;
+            overlay.style.display = 'flex';
+        }
+
+        function populateFilterOptions(data) {
+            const hostSelect = document.getElementById('filter-host');
+            const nodeSelect = document.getElementById('filter-node');
+            if (!hostSelect || !nodeSelect) return;
+
+            const previousHost = hostSelect.value;
+            const previousNode = nodeSelect.value;
+
+            const hostOptions = (data?.pve_hosts || [])
+                .map((host) => `<option value="${host.id}">${host.display_name || host.host}</option>`)
+                .join('');
+            hostSelect.innerHTML = `<option value="">All hosts</option>${hostOptions}`;
+
+            const nodeNames = new Set();
+            (data?.pve_hosts || []).forEach((host) => {
+                (host.nodes || []).forEach((node) => nodeNames.add(node.node));
+            });
+            const nodeOptions = Array.from(nodeNames)
+                .sort((a, b) => a.localeCompare(b))
+                .map((nodeName) => `<option value="${nodeName}">${nodeName}</option>`)
+                .join('');
+            nodeSelect.innerHTML = `<option value="">All nodes</option>${nodeOptions}`;
+
+            hostSelect.value = Array.from(hostSelect.options).some((opt) => opt.value === previousHost) ? previousHost : '';
+            nodeSelect.value = Array.from(nodeSelect.options).some((opt) => opt.value === previousNode) ? previousNode : '';
+            filterState.host = hostSelect.value;
+            filterState.node = nodeSelect.value;
+        }
+
+        function renderInventory(data) {
+            const container = document.getElementById('inventory-container');
+            if (!data || !data.pve_hosts || data.pve_hosts.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding: 5rem; color: var(--text-dim);">
+                    No Proxmox hosts configured. <a href="/settings" style="color: var(--accent); text-decoration:none;">Go to settings</a> to add one.
+                </div>`;
+                return;
+            }
+
+            let totalResources = 0;
+            let filteredResources = 0;
+            const changedResourceIds = getChangedResourceIdSet();
+
+            const filteredHosts = data.pve_hosts.map((host) => {
+                const filteredNodes = host.nodes.map((node) => {
+                    const resources = node.resources
+                        .slice()
+                        .filter((resource) => resourceMatchesFilters(host, node, resource))
+                        .sort(compareResources);
+                    totalResources += node.resources.length;
+                    filteredResources += resources.length;
+                    return { ...node, resources };
+                }).filter((node) => node.resources.length > 0);
+                return { ...host, nodes: filteredNodes };
+            }).filter((host) => host.nodes.length > 0);
+
+            updateFilterSummary(totalResources, filteredResources);
+
+            if (filteredHosts.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding: 4rem; color: var(--text-dim);">
+                    No results for the selected filters.
+                </div>`;
+                return;
+            }
+
+            container.innerHTML = filteredHosts.map(host => {
+                const isCollapsed = collapsedHosts[host.id];
+                
+                let vmCount = 0;
+                let lxcCount = 0;
+                host.nodes.forEach(node => {
+                    node.resources.forEach(res => {
+                        if (res.type === 'qemu') vmCount++;
+                        else if (res.type === 'lxc') lxcCount++;
+                    });
+                });
+
+                return `
+                <div class="host-card ${isCollapsed ? 'collapsed' : ''}" id="host-card-${host.id}">
+                    <div class="host-header" onclick="toggleHost(${host.id})">
+                        <div class="host-title">
+                            <span class="toggle-icon">▼</span>
+                            <span>${host.display_name || host.host}</span>
+                            ${host.display_name ? `<span style="font-size: 0.75rem; font-weight: normal; color: var(--text-dim); margin-left:8px;">${host.host}</span>` : ''}
+                            <div class="flex" style="margin-left:auto; align-items:center;">
+                                <span class="count-tag">${vmCount} VMs</span>
+                                <span class="count-tag">${lxcCount} LXCs</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="host-content">
+                        ${host.nodes.length === 0 ? '<div style="padding:2rem; color:var(--text-dim); text-align:center;">No nodes found.</div>' : host.nodes.map(node => `
+                            <div class="node-section">
+                                <div class="node-title">${node.node}</div>
+                                <table>
+                                    <thead>
+                                        <tr>
+                                            ${renderSortableHeader('name', 'Name')}
+                                            ${renderSortableHeader('type', 'Type')}
+                                            ${renderSortableHeader('ip', 'IP Address')}
+                                            ${renderSortableHeader('vmid', 'VMID')}
+                                            ${renderSortableHeader('cpus', 'CPUs')}
+                                            ${renderSortableHeader('maxmem', 'RAM')}
+                                            ${renderSortableHeader('maxdisk', 'Disk')}
+                                            ${renderSortableHeader('status', 'Status')}
+                                            <th>Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        ${node.resources.map(res => `
+                                            <tr>
+                                                <td style="font-weight: 500;">
+                                                    ${res.name}
+                                                    ${changedResourceIds.has(resourceIdentity(res)) ? changedBadgeHtml(res) : ''}
+                                                </td>
+                                                <td><span class="badge badge-${res.type}">${res.type.toUpperCase()}</span></td>
+                                                <td><code style="background: rgba(255,255,255,0.05); padding: 2px 4px; border-radius: 4px;">${res.ip || '—'}</code></td>
+                                                <td>${res.vmid}</td>
+                                                <td>${res.cpus}</td>
+                                                <td>${formatBytes(res.maxmem)}</td>
+                                                <td>${formatBytes(res.maxdisk)}</td>
+                                                <td>
+                                                    <span class="badge badge-${res.status === 'running' ? 'running' : (res.status === 'stopped' ? 'stopped' : 'other')}">
+                                                        ${res.status.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <div class="flex gap-2">
+                                                        <button onclick="event.stopPropagation(); togglePower(${host.id}, '${node.node}', '${res.type}', ${res.vmid}, '${res.status}', '${(res.name || '').replace(/'/g, "\\'")}', '${(host.display_name || host.host || '').replace(/'/g, "\\'")}')" class="btn-secondary btn-icon" title="${res.status === 'running' ? 'Stop' : 'Start'}">
+                                                            ${res.status === 'running' ? '■' : '▶'}
+                                                        </button>
+                                                        <button onclick="event.stopPropagation(); openSshModal('${res.ip}', '${res.name}')" class="btn-secondary btn-icon" title="SSH Terminal" ${!res.ip ? 'disabled' : ''}>
+                                                            &gt;_
+                                                        </button>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        `).join('')}
+                                    </tbody>
+                                </table>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            }).join('');
+        }
+
+        function compareResources(a, b) {
+            const key = sortState.key;
+            const direction = sortState.direction === 'asc' ? 1 : -1;
+
+            let aVal;
+            let bVal;
+
+            if (key === 'ip') {
+                aVal = ipSortValue(a.ip);
+                bVal = ipSortValue(b.ip);
+            } else if (key === 'vmid' || key === 'cpus' || key === 'maxmem' || key === 'maxdisk') {
+                aVal = Number(a[key] || 0);
+                bVal = Number(b[key] || 0);
+            } else {
+                aVal = String(a[key] || '').toLowerCase();
+                bVal = String(b[key] || '').toLowerCase();
+            }
+
+            if (aVal < bVal) return -1 * direction;
+            if (aVal > bVal) return 1 * direction;
+            return 0;
+        }
+
+        function toggleHost(hostId) {
+            const card = document.getElementById(`host-card-${hostId}`);
+            card.classList.toggle('collapsed');
+            collapsedHosts[hostId] = card.classList.contains('collapsed');
+            localStorage.setItem('collapsedHosts', JSON.stringify(collapsedHosts));
+        }
+
+        async function loadInventory() {
+            try {
+                cachedInventoryData = await fetchAPI('/api/inventory');
+                populateFilterOptions(cachedInventoryData);
+                renderInventory(cachedInventoryData);
+            } catch (err) {
+                const container = document.getElementById('inventory-container');
+                container.innerHTML = `<div style="text-align:center; padding: 4rem; color: var(--danger);">Failed to load inventory: ${err.message}</div>`;
+            }
+        }
+
+        async function loadScanStatus() {
+            let status;
+            try {
+                status = await fetchAPI('/api/scan/status');
+            } catch (err) {
+                showToast(`Errore status scan: ${err.message}`, 'error');
+                return;
+            }
+            if (!status) return;
+            lastScanSummaryCache = status.last_scan_summary || null;
+            const timeEl = document.getElementById('last-scan-time');
+            const errIndicator = document.getElementById('scan-error-indicator');
+
+            if (status.last_scan_time) {
+                const date = new Date(status.last_scan_time);
+                const duration = Number(status.last_scan_duration_seconds || 0).toFixed(1);
+                const state = status.last_scan_status === 'error' ? ' (error)' : '';
+                timeEl.firstChild.textContent = `Last scan: ${date.toLocaleString()} (${duration}s)${state}`;
+
+                if (status.last_scan_status === 'error' && status.last_scan_error) {
+                    errIndicator.style.display = 'inline';
+                    errIndicator.title = status.last_scan_error;
+                } else {
+                    errIndicator.style.display = 'none';
+                    errIndicator.title = '';
+                }
+
+                // First observed value initializes state. Subsequent changes mean a new scan ended.
+                if (!knownScanTime) {
+                    knownScanTime = status.last_scan_time;
+                } else if (knownScanTime !== status.last_scan_time) {
+                    knownScanTime = status.last_scan_time;
+                    loadInventory();
+                    const duration = Number(status.last_scan_duration_seconds || 0).toFixed(1);
+                    const isError = status.last_scan_status === 'error';
+                    const msg = isError
+                        ? `Scansione terminata con errore (${duration}s)`
+                        : `Scansione terminata in ${duration}s`;
+                    showToast(msg, isError ? 'error' : 'success');
+                    if (status.last_scan_summary && shownSummaryScanTime !== status.last_scan_time) {
+                        shownSummaryScanTime = status.last_scan_time;
+                        showScanSummaryModal(status.last_scan_summary, status.last_scan_status, status.last_scan_error);
+                    }
+                }
+            }
+        }
+
+        async function togglePower(hostId, node, type, vmid, currentStatus, resourceName, hostLabel) {
+            const action = currentStatus === 'running' ? 'stop' : 'start';
+            if (action === 'stop') {
+                const confirmed = window.confirm(`Stop ${resourceName || `VM ${vmid}`} on ${hostLabel || 'selected host'}?`);
+                if (!confirmed) return;
+            }
+            try {
+                const res = await fetchAPI(`/api/resource/${hostId}/${node}/${type}/${vmid}/${action}`, 'POST');
+                if (res && res.status === 'ok') {
+                    showToast(`Comando ${action} inviato`, 'success');
+                    setTimeout(loadInventory, 3000);
+                }
+            } catch (err) {
+                showToast(`Errore power: ${err.message}`, 'error');
+            }
+        }
+
+        async function triggerScan() {
+            const btn = document.getElementById('scan-btn');
+            const icon = document.getElementById('scan-icon');
+            btn.disabled = true; icon.classList.add('animate-spin');
+            try {
+                const triggerRes = await fetchAPI('/api/scan', 'POST');
+                if (triggerRes.status === 'busy') {
+                    btn.disabled = false;
+                    icon.classList.remove('animate-spin');
+                    showToast('Scansione gia in corso', 'warning');
+                    return;
+                }
+            } catch (err) {
+                btn.disabled = false;
+                icon.classList.remove('animate-spin');
+                showToast(`Errore avvio scansione: ${err.message}`, 'error');
+                return;
+            }
+            let lastTime = (await fetchAPI('/api/scan/status')).last_scan_time;
+            const poll = setInterval(async () => {
+                const status = await fetchAPI('/api/scan/status');
+                if (status.last_scan_time !== lastTime) {
+                    clearInterval(poll);
+                    btn.disabled = false;
+                    icon.classList.remove('animate-spin');
+                    knownScanTime = status.last_scan_time || knownScanTime;
+                    lastScanSummaryCache = status.last_scan_summary || lastScanSummaryCache;
+                    await loadScanStatus();
+                    await loadInventory();
+                    const duration = Number(status.last_scan_duration_seconds || 0).toFixed(1);
+                    const isError = status.last_scan_status === 'error';
+                    const msg = isError
+                        ? `Scansione terminata con errore (${duration}s)`
+                        : `Scansione terminata in ${duration}s`;
+                    showToast(msg, isError ? 'error' : 'success');
+                    if (status.last_scan_summary && shownSummaryScanTime !== status.last_scan_time) {
+                        shownSummaryScanTime = status.last_scan_time;
+                        showScanSummaryModal(status.last_scan_summary, status.last_scan_status, status.last_scan_error);
+                    }
+                }
+            }, 2000);
+        }
+
+        function openSshModal(ip, name) {
+            currentSshTarget = ip;
+            document.getElementById('ssh-modal-target').innerText = `Connecting to ${name} (${ip})`;
+            document.getElementById('ssh-modal-overlay').style.display = 'flex';
+        }
+
+        function connectSsh() {
+            const user = document.getElementById('ssh-user').value;
+            const pass = document.getElementById('ssh-pass').value;
+            const port = document.getElementById('ssh-port').value;
+            sessionStorage.setItem(`ssh_creds_${currentSshTarget}`, JSON.stringify({ user, password: pass, port }));
+            window.open(`/terminal.html?host=${currentSshTarget}`, '_blank');
+            document.getElementById('ssh-modal-overlay').style.display = 'none';
+        }
+
+        document.getElementById('scan-btn').onclick = triggerScan;
+        document.getElementById('settings-btn').onclick = () => window.location.href = '/settings';
+        document.getElementById('ssh-cancel').onclick = () => document.getElementById('ssh-modal-overlay').style.display = 'none';
+        document.getElementById('ssh-connect').onclick = connectSsh;
+        document.getElementById('toggle-ssh-advanced').onclick = (e) => {
+            e.preventDefault();
+            const adv = document.getElementById('ssh-advanced');
+            adv.style.display = adv.style.display === 'none' ? 'block' : 'none';
+        }
+        document.getElementById('scan-summary-ok').onclick = () => {
+            document.getElementById('scan-summary-overlay').style.display = 'none';
+        };
+        document.getElementById('scan-summary-overlay').onclick = (e) => {
+            if (e.target.id === 'scan-summary-overlay') {
+                document.getElementById('scan-summary-overlay').style.display = 'none';
+            }
+        };
+        document.getElementById('last-summary-btn').onclick = async () => {
+            if (!lastScanSummaryCache) {
+                try {
+                    const status = await fetchAPI('/api/scan/status');
+                    lastScanSummaryCache = status?.last_scan_summary || null;
+                    if (!lastScanSummaryCache) {
+                        showToast('No scan summary available yet', 'warning');
+                        return;
+                    }
+                    showScanSummaryModal(lastScanSummaryCache, status.last_scan_status, status.last_scan_error);
+                    return;
+                } catch (err) {
+                    showToast(`Cannot load scan summary: ${err.message}`, 'error');
+                    return;
+                }
+            }
+            showScanSummaryModal(lastScanSummaryCache, null, null);
+        };
+        document.getElementById('filter-search').oninput = (e) => {
+            const newValue = String(e.target.value || '').trim().toLowerCase();
+            clearTimeout(searchDebounceTimer);
+            searchDebounceTimer = setTimeout(() => {
+                filterState.search = newValue;
+                renderInventory(cachedInventoryData);
+            }, 250);
+        };
+        document.getElementById('filter-host').onchange = (e) => {
+            filterState.host = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('filter-node').onchange = (e) => {
+            filterState.node = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('filter-type').onchange = (e) => {
+            filterState.type = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('filter-status').onchange = (e) => {
+            filterState.status = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('filter-has-ip').onchange = (e) => {
+            filterState.hasIp = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('sort-key-select').onchange = (e) => {
+            sortState.key = e.target.value;
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('sort-direction-btn').onclick = () => {
+            sortState.direction = sortState.direction === 'asc' ? 'desc' : 'asc';
+            updateSortDirectionButton();
+            renderInventory(cachedInventoryData);
+        };
+        document.getElementById('reset-filters-btn').onclick = () => {
+            filterState = { search: '', host: '', node: '', type: '', status: '', hasIp: '' };
+            document.getElementById('filter-search').value = '';
+            document.getElementById('filter-host').value = '';
+            document.getElementById('filter-node').value = '';
+            document.getElementById('filter-type').value = '';
+            document.getElementById('filter-status').value = '';
+            document.getElementById('filter-has-ip').value = '';
+            sortState = { key: 'ip', direction: 'asc' };
+            document.getElementById('sort-key-select').value = sortState.key;
+            updateSortDirectionButton();
+            renderInventory(cachedInventoryData);
+        };
+
+        document.getElementById('sort-key-select').value = sortState.key;
+        updateSortDirectionButton();
+        loadInventory();
+        loadScanStatus();
+        setInterval(loadScanStatus, 10000);
+    </script>
+</body>
+</html>
