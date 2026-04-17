@@ -1,6 +1,6 @@
 # <img src="ProxLook-logo.png" alt="ProxLook Logo" width="40" height="40" style="vertical-align: middle; margin-right: 10px;"> ProxLook
 
-**ProxLook** is a self‑hosted web application that scans and visualizes your Proxmox VE environment in a single, clean dashboard.
+**[ProxLook](https://proxlook.beggi.be/)** is a self‑hosted web application that scans and visualizes your Proxmox VE environment in a single, clean dashboard.
 
 Built for **homelabs**, it provides fast visibility into nodes, virtual machines, and LXC containers — with optional control and troubleshooting tools when you need them.
 
