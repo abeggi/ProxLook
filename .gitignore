@@ -61,10 +61,8 @@ ehthumbs.db
 Thumbs.db
 
 # Docker
-!.dockerignore
-Dockerfile
-docker-compose.yml
-docker-build.sh
+# Note: Docker files SHOULD be included in the repository
+# .dockerignore is the only file that should be ignored for Docker itself
 
 # Test coverage
 .coverage
@@ -80,5 +78,5 @@ README.md.original
 # Systemd service example
 *.service.example
 
-# Docker env example
-.env.docker.example
+# Docker env example (keep in repo as example)
+# .env.docker.example

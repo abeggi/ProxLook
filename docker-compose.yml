@@ -1,0 +1,42 @@
+# ProxLook - Docker Compose Configuration
+# Simple deployment with persistent data storage
+
+version: '3.8'
+
+services:
+  proxlook:
+    build: .
+    container_name: proxlook
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    environment:
+      - APP_PORT=8090
+      - DATABASE_URL=sqlite:////app/data/proxlook.db
+      - LOG_LEVEL=INFO
+      - LOG_PATH=/app/app.log
+      - LOG_MAX_BYTES=5242880
+      - LOG_BACKUP_COUNT=5
+    volumes:
+      # Persistent data storage
+      - proxlook_data:/app/data
+      # Optional: Mount custom .env file
+      # - ./custom.env:/app/.env:ro
+      # Optional: Mount logs directory for external log collection
+      # - ./logs:/app
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8090/api/scan/status"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+    networks:
+      - proxlook_network
+
+volumes:
+  proxlook_data:
+    driver: local
+
+networks:
+  proxlook_network:
+    driver: bridge
