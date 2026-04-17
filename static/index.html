@@ -745,7 +745,7 @@
                                                 </td>
                                                 <td>
                                                     <div class="flex gap-2">
-                                                        <button onclick="event.stopPropagation(); togglePower(${host.id}, '${node.node}', '${res.type}', ${res.vmid}, '${res.status}', '${(res.name || '').replace(/'/g, "\\'")}', '${(host.display_name || host.host || '').replace(/'/g, "\\'")}')" class="btn-secondary btn-icon" title="${res.status === 'running' ? 'Stop' : 'Start'}">
+                                                        <button id="power-btn-${host.id}-${node.node}-${res.type}-${res.vmid}" onclick="event.stopPropagation(); togglePower(${host.id}, '${node.node}', '${res.type}', ${res.vmid}, '${res.status}', '${(res.name || '').replace(/'/g, "\\'")}', '${(host.display_name || host.host || '').replace(/'/g, "\\'")}')" class="btn-secondary btn-icon" title="${res.status === 'running' ? 'Stop' : 'Start'}">
                                                             ${res.status === 'running' ? '■' : '▶'}
                                                         </button>
                                                         <button onclick="event.stopPropagation(); openSshModal('${res.ip}', '${res.name}')" class="btn-secondary btn-icon" title="SSH Terminal" ${!res.ip ? 'disabled' : ''}>
@@ -859,14 +859,40 @@
                 const confirmed = window.confirm(`Stop ${resourceName || `VM ${vmid}`} on ${hostLabel || 'selected host'}?`);
                 if (!confirmed) return;
             }
+            
+            // Show toast immediately
+            showToast(`Comando ${action} inviato...`, 'info');
+            
+            // Disable the button to prevent multiple clicks
+            const buttonId = `power-btn-${hostId}-${node}-${type}-${vmid}`;
+            const button = document.getElementById(buttonId);
+            if (button) {
+                button.disabled = true;
+                button.innerHTML = `<span class="animate-spin">↻</span>`;
+            }
+            
             try {
                 const res = await fetchAPI(`/api/resource/${hostId}/${node}/${type}/${vmid}/${action}`, 'POST');
                 if (res && res.status === 'ok') {
-                    showToast(`Comando ${action} inviato`, 'success');
-                    setTimeout(loadInventory, 3000);
+                    showToast(`${resourceName || `VM ${vmid}`} ${action === 'start' ? 'avviata' : 'fermata'}`, 'success');
+                    setTimeout(loadInventory, 2000);
                 }
             } catch (err) {
-                showToast(`Errore power: ${err.message}`, 'error');
+                showToast(`Errore: ${err.message}`, 'error');
+                // Re-enable button on error
+                if (button) {
+                    button.disabled = false;
+                    button.innerHTML = currentStatus === 'running' ? '■' : '▶';
+                }
+            } finally {
+                // Re-enable button after a timeout even if successful
+                // (the button will be recreated when inventory reloads)
+                setTimeout(() => {
+                    if (button && !button.disabled) {
+                        button.disabled = false;
+                        button.innerHTML = action === 'start' ? '■' : '▶';
+                    }
+                }, 5000);
             }
         }
 

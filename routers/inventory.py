@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
-from database import get_db
+from database import get_db, SessionLocal
 from models import Resource, PVEHost
 import asyncio
 import datetime
+import time
 from proxmoxer import ProxmoxAPI
 
 router = APIRouter(prefix="/api")
@@ -67,6 +68,49 @@ async def get_inventory_flat(db: Session = Depends(get_db)):
     resources = db.query(Resource).all()
     return [format_resource(r) for r in resources]
 
+def get_vm_status(proxmox, node, vmid, vm_type):
+    """Get current status of a VM/LXC"""
+    try:
+        if vm_type == "qemu":
+            status_data = proxmox.nodes(node).qemu(vmid).status.current.get()
+        else:  # lxc
+            status_data = proxmox.nodes(node).lxc(vmid).status.current.get()
+        return status_data.get("status", "unknown")
+    except Exception as e:
+        # Log the error but return unknown to continue waiting
+        return "unknown"
+
+def wait_for_status(proxmox, node, vmid, vm_type, target_status, timeout=60, check_interval=3):
+    """
+    Wait for VM/LXC to reach target status.
+    Returns True if status reached, False if timeout.
+    """
+    start_time = time.time()
+    last_status = "unknown"
+    
+    while time.time() - start_time < timeout:
+        try:
+            current_status = get_vm_status(proxmox, node, vmid, vm_type)
+            
+            # Track status changes for debugging
+            if current_status != last_status:
+                last_status = current_status
+            
+            if current_status == target_status:
+                return True
+                
+            # If we're stopping and status is already stopped, return success
+            if target_status == "stopped" and current_status in ["stopped", "unknown"]:
+                return True
+                
+        except Exception as e:
+            # If we get an error checking status, continue waiting
+            pass
+            
+        time.sleep(check_interval)
+    
+    return False
+
 @router.post("/resource/{pve_host_id}/{node}/{type}/{vmid}/{action}")
 async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, action: str, db: Session = Depends(get_db)):
     if action not in ["start", "stop"]:
@@ -77,34 +121,121 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
     host_config = db.query(PVEHost).filter(PVEHost.id == pve_host_id).first()
     if not host_config:
         raise HTTPException(status_code=404, detail="Host not found")
+    
+    # Get the resource before the action to check if it exists
+    resource = db.query(Resource).filter(
+        Resource.pve_host_id == pve_host_id,
+        Resource.node == node,
+        Resource.type == type,
+        Resource.vmid == vmid
+    ).first()
+    
+    if not resource:
+        raise HTTPException(status_code=404, detail="Resource not found")
         
     def do_action():
-        proxmox = ProxmoxAPI(
-            host_config.host,
-            port=host_config.port,
-            user=host_config.user,
-            token_name=host_config.token_name,
-            token_value=host_config.token_value,
-            verify_ssl=host_config.verify_ssl
-        )
-        if type == "qemu":
-            if action == "start":
-                proxmox.nodes(node).qemu(vmid).status.start.post()
-            else:
-                proxmox.nodes(node).qemu(vmid).status.stop.post()
-        else:
-            if action == "start":
-                proxmox.nodes(node).lxc(vmid).status.start.post()
-            else:
-                proxmox.nodes(node).lxc(vmid).status.stop.post()
-        return {"status": "ok"}
+        # Create a new database session for the thread
+        db_thread = SessionLocal()
+        try:
+            proxmox = ProxmoxAPI(
+                host_config.host,
+                port=host_config.port,
+                user=host_config.user,
+                token_name=host_config.token_name,
+                token_value=host_config.token_value,
+                verify_ssl=host_config.verify_ssl
+            )
+            
+            # Execute the action
+            if type == "qemu":
+                if action == "start":
+                    proxmox.nodes(node).qemu(vmid).status.start.post()
+                    # Wait for VM to reach running state
+                    if wait_for_status(proxmox, node, vmid, "qemu", "running"):
+                        # Update database status
+                        resource_thread = db_thread.query(Resource).filter(
+                            Resource.pve_host_id == pve_host_id,
+                            Resource.node == node,
+                            Resource.type == type,
+                            Resource.vmid == vmid
+                        ).first()
+                        if resource_thread:
+                            resource_thread.status = "running"
+                            resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            db_thread.commit()
+                    else:
+                        raise Exception("VM failed to reach running state within timeout")
+                else:
+                    proxmox.nodes(node).qemu(vmid).status.stop.post()
+                    # Wait for VM to reach stopped state
+                    if wait_for_status(proxmox, node, vmid, "qemu", "stopped"):
+                        # Update database status to stopped
+                        resource_thread = db_thread.query(Resource).filter(
+                            Resource.pve_host_id == pve_host_id,
+                            Resource.node == node,
+                            Resource.type == type,
+                            Resource.vmid == vmid
+                        ).first()
+                        if resource_thread:
+                            resource_thread.status = "stopped"
+                            resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            db_thread.commit()
+                    else:
+                        raise Exception("VM failed to reach stopped state within timeout")
+            else:  # lxc
+                if action == "start":
+                    proxmox.nodes(node).lxc(vmid).status.start.post()
+                    # Wait for LXC to reach running state
+                    if wait_for_status(proxmox, node, vmid, "lxc", "running"):
+                        # Update database status
+                        resource_thread = db_thread.query(Resource).filter(
+                            Resource.pve_host_id == pve_host_id,
+                            Resource.node == node,
+                            Resource.type == type,
+                            Resource.vmid == vmid
+                        ).first()
+                        if resource_thread:
+                            resource_thread.status = "running"
+                            resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            db_thread.commit()
+                    else:
+                        raise Exception("LXC failed to reach running state within timeout")
+                else:
+                    proxmox.nodes(node).lxc(vmid).status.stop.post()
+                    # Wait for LXC to reach stopped state
+                    if wait_for_status(proxmox, node, vmid, "lxc", "stopped"):
+                        # Update database status to stopped
+                        resource_thread = db_thread.query(Resource).filter(
+                            Resource.pve_host_id == pve_host_id,
+                            Resource.node == node,
+                            Resource.type == type,
+                            Resource.vmid == vmid
+                        ).first()
+                        if resource_thread:
+                            resource_thread.status = "stopped"
+                            resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            db_thread.commit()
+                    else:
+                        raise Exception("LXC failed to reach stopped state within timeout")
+            
+            return {"status": "ok", "message": f"Resource {action} completed successfully"}
+        except Exception as e:
+            # Rollback any database changes on error
+            db_thread.rollback()
+            raise e
+        finally:
+            db_thread.close()
 
     loop = asyncio.get_event_loop()
     try:
-        await loop.run_in_executor(None, do_action)
-        return {"status": "ok"}
+        result = await loop.run_in_executor(None, do_action)
+        return result
     except Exception as e:
+        error_msg = str(e)
+        # Provide more user-friendly error messages
+        if "timeout" in error_msg.lower() or "failed to reach" in error_msg.lower():
+            error_msg = f"Resource did not reach '{action}' state within timeout period"
         return JSONResponse(
             status_code=502,
-            content={"status": "error", "message": str(e)},
+            content={"status": "error", "message": error_msg},
         )
