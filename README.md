@@ -4,6 +4,10 @@
 
 Built for **homelabs**, it provides fast visibility into nodes, virtual machines, and LXC containers — with optional control and troubleshooting tools when you need them.
 
+![ProxLook Dashboard](screenshot.png)
+
+*ProxLook dashboard showing inventory of Proxmox VMs and LXC containers*
+
 ---
 
 ## Why ProxLook?
