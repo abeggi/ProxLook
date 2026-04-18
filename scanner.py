@@ -216,7 +216,9 @@ def get_vm_ip(proxmox, node, vmid, vm_type, runtime_data=None):
     # 1. Try QEMU Guest Agent (for VMs)
     if vm_type == 'qemu':
         try:
-            interfaces = proxmox.nodes(node).qemu(vmid).agent.network_get_interfaces.get()
+            interfaces = proxmox.nodes(node).qemu(vmid).agent('network-get-interfaces').get()
+            if isinstance(interfaces, dict) and 'result' in interfaces:
+                interfaces = interfaces['result']
             for iface in interfaces:
                 for addr in iface.get('ip-addresses', []):
                     ip = addr.get('ip-address')

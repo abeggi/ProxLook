@@ -26,17 +26,20 @@ scheduler = BackgroundScheduler()
 def update_scheduler_job():
     db = SessionLocal()
     cron_setting = db.query(Setting).filter(Setting.key == "scan_cron").first()
-    cron_expr = cron_setting.value if cron_setting else "*/5 * * * *"
+    cron_expr = cron_setting.value if cron_setting else ""
     db.close()
     
     if scheduler.get_job('scan_job'):
         scheduler.remove_job('scan_job')
     
-    scheduler.add_job(
-        run_scan,
-        CronTrigger.from_crontab(cron_expr),
-        id='scan_job',
-        max_instances=1,
-        coalesce=True,
-    )
-    logger.info(f"Scan job updated with cron: {cron_expr}")
+    if cron_expr and cron_expr.strip():
+        scheduler.add_job(
+            run_scan,
+            CronTrigger.from_crontab(cron_expr),
+            id='scan_job',
+            max_instances=1,
+            coalesce=True,
+        )
+        logger.info(f"Scan job updated with cron: {cron_expr}")
+    else:
+        logger.info("No scan cron expression set, scan job disabled")

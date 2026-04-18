@@ -46,7 +46,7 @@ def init_db():
     db = SessionLocal()
     # Initialize default settings
     if not db.query(Setting).filter(Setting.key == "scan_cron").first():
-        db.add(Setting(key="scan_cron", value="*/5 * * * *"))
+        db.add(Setting(key="scan_cron", value=""))
     if not db.query(ScanStatus).first():
         db.add(ScanStatus(id=1))
     db.commit()

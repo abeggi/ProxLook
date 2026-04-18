@@ -25,7 +25,6 @@ from dotenv import load_dotenv
 
 from database import init_db, get_db
 from scheduler_manager import scheduler, update_scheduler_job
-from scanner import run_scan
 from routers import inventory, scan, settings, export
 from logging_setup import configure_logging
 
@@ -65,8 +64,6 @@ async def startup_event():
     init_db()
     update_scheduler_job()
     scheduler.start()
-    # Trigger initial scan
-    asyncio.get_event_loop().run_in_executor(None, run_scan)
 
 @app.on_event("shutdown")
 async def shutdown_event():
