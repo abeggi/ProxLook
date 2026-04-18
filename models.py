@@ -43,6 +43,7 @@ class Resource(Base):
     type = Column(String) # 'qemu' or 'lxc'
     status = Column(String)
     ip = Column(String, default="")
+    ssh_port_open = Column(Boolean, default=True)
     cpus = Column(Integer)
     maxmem = Column(Integer)
     maxdisk = Column(Integer)

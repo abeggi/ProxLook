@@ -768,9 +768,11 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
                                                         <button id="power-btn-${host.id}-${node.node}-${res.type}-${res.vmid}" onclick="event.stopPropagation(); togglePower(${host.id}, '${node.node}', '${res.type}', ${res.vmid}, '${res.status}', '${(res.name || '').replace(/'/g, "\\'")}', '${(host.display_name || host.host || '').replace(/'/g, "\\'")}')" class="btn-secondary btn-icon" title="${res.status === 'running' ? 'Stop' : 'Start'}">
                                                             ${res.status === 'running' ? '■' : '▶'}
                                                         </button>
-                                                        <button onclick="event.stopPropagation(); openSshModal('${res.ip}', '${res.name}')" class="btn-secondary btn-icon" title="SSH Terminal" ${!res.ip ? 'disabled' : ''}>
-                                                            &gt;_
-                                                        </button>
+                                                        ${res.ip && res.status === 'running' && res.ssh_port_open ? `
+                                                            <button onclick="event.stopPropagation(); openSshModal('${res.ip}', '${res.name}')" class="btn-secondary btn-icon" title="SSH Terminal">
+                                                                &gt;_
+                                                            </button>
+                                                        ` : ''}
                                                     </div>
                                                 </td>
                                             </tr>
@@ -978,6 +980,14 @@ along with this program.  If not, see <https://www.gnu.org/licenses/>.
         document.getElementById('settings-btn').onclick = () => window.location.href = '/settings';
         document.getElementById('ssh-cancel').onclick = () => document.getElementById('ssh-modal-overlay').style.display = 'none';
         document.getElementById('ssh-connect').onclick = connectSsh;
+        
+        // Add Enter key support in SSH password field only
+        document.getElementById('ssh-pass').addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.getElementById('ssh-connect').click();
+            }
+        });
         document.getElementById('toggle-ssh-advanced').onclick = (e) => {
             e.preventDefault();
             const adv = document.getElementById('ssh-advanced');

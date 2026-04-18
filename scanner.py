@@ -16,6 +16,7 @@
 import datetime
 import logging
 import re
+import socket
 import threading
 import json
 from proxmoxer import ProxmoxAPI
@@ -37,6 +38,20 @@ def _valid_ipv4(ip):
         return False
     parts = ip.split(".")
     return all(0 <= int(p) <= 255 for p in parts)
+
+def _check_ssh_port_open(ip, timeout=2):
+    """Check if SSH port (22) is open on the given IP address."""
+    if not ip or not _valid_ipv4(ip):
+        return True  # Default to True if IP is invalid
+    
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip, 22))
+        sock.close()
+        return result == 0
+    except Exception:
+        return True  # Default to True on error
 
 def _extract_ipv4_from_text(value):
     if not value:
@@ -330,6 +345,7 @@ def run_scan():
                             'type': 'qemu',
                             'status': vm.get('status', 'unknown'),
                             'ip': ip,
+                            'ssh_port_open': _check_ssh_port_open(ip),
                             'cpus': vm.get('cpus', 0),
                             'maxmem': vm.get('maxmem', 0),
                             'maxdisk': vm.get('maxdisk', 0),
@@ -351,6 +367,7 @@ def run_scan():
                             'type': 'lxc',
                             'status': lxc.get('status', 'unknown'),
                             'ip': ip,
+                            'ssh_port_open': _check_ssh_port_open(ip),
                             'cpus': lxc.get('cpus', 0),
                             'maxmem': lxc.get('maxmem', 0),
                             'maxdisk': lxc.get('maxdisk', 0),

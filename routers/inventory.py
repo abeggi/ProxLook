@@ -21,6 +21,7 @@ from models import Resource, PVEHost
 import asyncio
 import datetime
 import time
+import socket
 from proxmoxer import ProxmoxAPI
 
 router = APIRouter(prefix="/api")
@@ -41,6 +42,7 @@ def format_resource(res: Resource):
         "type": res.type,
         "status": res.status,
         "ip": res.ip,
+        "ssh_port_open": res.ssh_port_open,
         "cpus": res.cpus,
         "maxmem": res.maxmem,
         "maxdisk": res.maxdisk,
@@ -126,6 +128,25 @@ def wait_for_status(proxmox, node, vmid, vm_type, target_status, timeout=60, che
     
     return False
 
+def check_ssh_port(ip, timeout=2):
+    """Check if SSH port (22) is open on the given IP."""
+    if not ip:
+        return False
+    
+    try:
+        # Simple IPv4 validation
+        parts = ip.split('.')
+        if len(parts) != 4:
+            return False
+        
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.settimeout(timeout)
+        result = sock.connect_ex((ip, 22))
+        sock.close()
+        return result == 0
+    except Exception:
+        return False
+
 @router.post("/resource/{pve_host_id}/{node}/{type}/{vmid}/{action}")
 async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, action: str, db: Session = Depends(get_db)):
     if action not in ["start", "stop"]:
@@ -165,7 +186,7 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
             if type == "qemu":
                 if action == "start":
                     proxmox.nodes(node).qemu(vmid).status.start.post()
-                    # Wait for VM to reach running state
+                     # Wait for VM to reach running state
                     if wait_for_status(proxmox, node, vmid, "qemu", "running"):
                         # Update database status
                         resource_thread = db_thread.query(Resource).filter(
@@ -177,12 +198,17 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
                         if resource_thread:
                             resource_thread.status = "running"
                             resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            
+                            # Check SSH port if host has IP
+                            if resource_thread.ip:
+                                resource_thread.ssh_port_open = check_ssh_port(resource_thread.ip)
+                            
                             db_thread.commit()
                     else:
                         raise Exception("VM failed to reach running state within timeout")
                 else:
                     proxmox.nodes(node).qemu(vmid).status.stop.post()
-                    # Wait for VM to reach stopped state
+                     # Wait for VM to reach stopped state
                     if wait_for_status(proxmox, node, vmid, "qemu", "stopped"):
                         # Update database status to stopped
                         resource_thread = db_thread.query(Resource).filter(
@@ -194,13 +220,14 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
                         if resource_thread:
                             resource_thread.status = "stopped"
                             resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            resource_thread.ssh_port_open = False  # Host spento = SSH non attivo
                             db_thread.commit()
                     else:
                         raise Exception("VM failed to reach stopped state within timeout")
             else:  # lxc
                 if action == "start":
                     proxmox.nodes(node).lxc(vmid).status.start.post()
-                    # Wait for LXC to reach running state
+                     # Wait for LXC to reach running state
                     if wait_for_status(proxmox, node, vmid, "lxc", "running"):
                         # Update database status
                         resource_thread = db_thread.query(Resource).filter(
@@ -212,6 +239,11 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
                         if resource_thread:
                             resource_thread.status = "running"
                             resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            
+                            # Check SSH port if host has IP
+                            if resource_thread.ip:
+                                resource_thread.ssh_port_open = check_ssh_port(resource_thread.ip)
+                            
                             db_thread.commit()
                     else:
                         raise Exception("LXC failed to reach running state within timeout")
@@ -229,6 +261,7 @@ async def resource_action(pve_host_id: int, node: str, type: str, vmid: int, act
                         if resource_thread:
                             resource_thread.status = "stopped"
                             resource_thread.last_seen = datetime.datetime.now(datetime.timezone.utc).replace(tzinfo=None)
+                            resource_thread.ssh_port_open = False  # Host spento = SSH non attivo
                             db_thread.commit()
                     else:
                         raise Exception("LXC failed to reach stopped state within timeout")
