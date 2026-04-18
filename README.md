@@ -363,12 +363,10 @@ Running ProxLook **directly exposed to the internet is strongly discouraged**.
 - **Smart SSH button visibility**: SSH terminal button now only appears for running hosts with an IP address and open SSH port (port 22)
 - **Windows VM support**: Windows VMs and other hosts without SSH no longer show the SSH button
 - **Auto SSH port detection**: Automatic check for SSH port availability when hosts are started
-- **Keyboard shortcut**: Press Enter in the password field to trigger SSH connection
 - **Real-time status**: SSH button visibility updates immediately when starting/stopping hosts
 
 ### Bug Fixes & Enhancements
 - Fixed SSH button display logic for stopped hosts
-- Improved IP address detection for VMs without QEMU Guest Agent
 - Enhanced resource status tracking
 
 ---
